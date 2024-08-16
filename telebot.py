@@ -1,10 +1,10 @@
 import os
+import io
 import json
-import asyncio
 import pdfplumber
-from telegram import Update, Document, User, Bot
-from telegram.ext import Application, CommandHandler, MessageHandler, ConversationHandler, CallbackContext, filters
-from flask import Flask, request
+from telegram import Update, Document, User
+from telegram.ext import Updater, Application, CommandHandler, MessageHandler, ConversationHandler, CallbackContext, filters
+from reportlab.lib.pagesizes import letter
 from GeneratePDF import generate_pdf  # Adjust the import as per your project structure
 from app import process_resume  # Adjust the import as per your project structure
 from json_repair import repair_json
@@ -16,34 +16,8 @@ load_dotenv()
 # Define your Telegram bot token as an environment variable
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
-# Define conversation states
+# States for the conversation handler
 JOB_DESCRIPTION, RESUME = range(2)
-
-# Initialize the bot
-bot = Bot(token=TELEGRAM_BOT_TOKEN)
-webhook_url = 'https://telbot-rzzf.onrender.com/post'
-
-# Set up Flask
-app = Flask(__name__)
-
-# Function to extract text from a PDF file
-def extract_text_from_pdf(pdf_path):
-    text = ""
-    with pdfplumber.open(pdf_path) as pdf:
-        for page in pdf.pages:
-            text += page.extract_text() or ""
-    return text
-
-# Asynchronous function to set the webhook
-async def set_webhook():
-    await bot.set_webhook(url=webhook_url)
-
-# Flask route to handle incoming webhook updates
-@app.route('/post', methods=['POST'])
-async def webhook_handler():
-    update = Update.de_json(request.get_json(force=True), bot)
-    await application.update_queue.put(update)
-    return 'ok'
 
 # Define a function to start the conversation
 async def start(update: Update, context: CallbackContext) -> int:
@@ -64,7 +38,14 @@ async def receive_job_description(update: Update, context: CallbackContext) -> i
     await update.message.reply_text('Got it! Now, please send the resume in PDF format.')
     return RESUME
 
-# Define a function to handle the resume file upload
+# Function to extract text from a PDF file
+def extract_text_from_pdf(pdf_path):
+    text = ""
+    with pdfplumber.open(pdf_path) as pdf:
+        for page in pdf.pages:
+            text += page.extract_text() or ""
+    return text
+
 async def receive_resume(update: Update, context: CallbackContext) -> int:
     document: Document = update.message.document
     if document.mime_type == 'application/pdf':
@@ -88,6 +69,7 @@ async def receive_resume(update: Update, context: CallbackContext) -> int:
 
         # Repair and parse the JSON string
         text_content = repair_json(text_content.replace("`", "'"))
+        # print(text_content)
         if not text_content.strip():
             print("Error: The JSON string is empty.")
         else:
@@ -119,28 +101,24 @@ async def receive_resume(update: Update, context: CallbackContext) -> int:
 async def start_command(update: Update, context: CallbackContext) -> None:
     await update.message.reply_text('Welcome! Use /start to begin the process.')
 
-# Main entry point
+# Create an application object
+application = (Application.builder().
+               token(TELEGRAM_BOT_TOKEN).
+               get_updates_pool_timeout(60).
+               get_updates_read_timeout(90)
+               .build()
+               )
+conv_handler = ConversationHandler(
+    entry_points=[CommandHandler('start', start)],
+    states={
+        JOB_DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_job_description)],
+        RESUME: [MessageHandler(filters.Document.ALL, receive_resume)],
+    },
+    fallbacks=[],
+)
+
+# Add handlers for commands and conversations
+application.add_handler(conv_handler)
+# Start the bot
 if __name__ == '__main__':
-    application = (
-        Application.builder()
-        .token(TELEGRAM_BOT_TOKEN)
-        .build()
-    )
-
-    # Add command and message handlers to the application
-    application.add_handler(CommandHandler("start", start_command))
-
-    # Add the conversation handler for the resume processing flow
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', start)],
-        states={
-            JOB_DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_job_description)],
-            RESUME: [MessageHandler(filters.Document.PDF, receive_resume)],
-        },
-        fallbacks=[],
-    )
-    application.add_handler(conv_handler)
-
-    # Set the webhook before starting Flask
-    asyncio.run(set_webhook())
-    app.run(host="0.0.0.0", port=5000)
+    application.run_polling()
