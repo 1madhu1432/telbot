@@ -15,7 +15,7 @@ load_dotenv()
 
 # Define your Telegram bot token as an environment variable
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-
+JOB_DESCRIPTION, RESUME = range(2)
 # Initialize the bot
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
 webhook_url = 'https://telbot-rzzf.onrender.com/post'
