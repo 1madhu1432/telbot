@@ -121,7 +121,8 @@ async def start_command(update: Update, context: CallbackContext) -> None:
 #     fallbacks=[],
 # )
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
-
+webhook_url = 'https://resumesyncai.onrender.com/post'
+bot.set_webhook(url=webhook_url)
 app = Flask(__name__)
 @app.route('/post', methods=['POST'])
 async def webhook_handler():
