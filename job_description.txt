@@ -1,0 +1,35 @@
+About the Role
+We are seeking a passionate MERN Stack Developer Intern who will assist in developing and maintaining web applications using the MERN (MongoDB, Express.js, React.js, Node.js) stack. This internship offers a valuable opportunity to gain hands-on experience in a real-world development environment and work closely with experienced developers.
+
+Key Responsibilities:
+- Assist in the design, development, and maintenance of web applications using MongoDB, Express.js, React.js, and Node.js.
+- Support the development of RESTful APIs and their integration with front-end components.
+- Help optimize applications for maximum speed and scalability.
+- Implement responsive design and ensure cross-browser compatibility.
+- Collaborate with UI/UX designers to translate designs into functional user interfaces.
+- Participate in troubleshooting, debugging, and upgrading existing applications.
+- Contribute to code reviews and provide constructive feedback.
+- Stay updated with emerging technologies and industry trends.
+
+Required Skills:
+- Proficiency in JavaScript and the MERN stack (MongoDB, Express.js, React.js, Node.js).
+- Basic knowledge of front-end technologies such as HTML5, CSS3, and JavaScript frameworks/libraries.
+- Familiarity with RESTful APIs and web services.
+- Understanding of responsive design principles and cross-browser compatibility.
+- Experience with version control systems (e.g., Git).
+- Strong problem-solving skills and attention to detail.
+- Excellent communication and teamwork skills.
+- Willingness to learn and adapt in a fast-paced environment.
+
+Preferred Qualifications:
+- Experience with cloud services (AWS, Azure, Google Cloud) is a plus.
+- Familiarity with containerization tools like Docker is a plus.
+- Understanding of Agile/Scrum methodologies is a plus.
+- Currently pursuing or recently graduated with a degree in Computer Science, Engineering, or a related field.
+
+*Benefits:*
+- Gain hands-on experience with the MERN stack and modern web development practices.
+- Work closely with experienced developers and gain valuable mentorship.
+- Flexible working hours to accommodate your academic schedule.
+- Opportunity to work on real projects and contribute to the company's success.
+- Certificate of completion and letter of recommendation upon successful completion of the internship.
