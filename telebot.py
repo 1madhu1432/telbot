@@ -18,7 +18,7 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 # Initialize the bot
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
-webhook_url = 'https://resumesyncai.onrender.com/post'
+webhook_url = 'https://telbot-rzzf.onrender.com/post'
 
 # Set up Flask
 app = Flask(__name__)
