@@ -37,9 +37,9 @@ async def set_webhook():
 
 # Flask route to handle incoming webhook updates
 @app.route('/post', methods=['POST'])
-def webhook_handler():
+async def webhook_handler():
     update = Update.de_json(request.get_json(force=True), bot)
-    dispatcher.process_update(update)
+    await application.update_queue.put(update)
     return 'ok'
 
 # Define a function to start the conversation
@@ -116,8 +116,28 @@ async def receive_resume(update: Update, context: CallbackContext) -> int:
 async def start_command(update: Update, context: CallbackContext) -> None:
     await update.message.reply_text('Welcome! Use /start to begin the process.')
 
-# Running the webhook setup before starting the Flask app
+# Main entry point
 if __name__ == '__main__':
+    application = (
+        Application.builder()
+        .token(TELEGRAM_BOT_TOKEN)
+        .build()
+    )
+
+    # Add command and message handlers to the application
+    application.add_handler(CommandHandler("start", start_command))
+
+    # Add the conversation handler for the resume processing flow
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler('start', start)],
+        states={
+            JOB_DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_job_description)],
+            RESUME: [MessageHandler(filters.Document.PDF, receive_resume)],
+        },
+        fallbacks=[],
+    )
+    application.add_handler(conv_handler)
+
     # Set the webhook before starting Flask
     asyncio.run(set_webhook())
-    app.run(port=5000)
+    app.run(host="0.0.0.0", port=5000)
