@@ -112,7 +112,7 @@ async def receive_resume(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
         except Exception as e:
             logging.error(f"An error occurred: {e}")
-            await update.message.reply_text('An error occurred while processing your request.')
+            # await update.message.reply_text('An error occurred while processing your request.')
             return ConversationHandler.END
 
     else:
