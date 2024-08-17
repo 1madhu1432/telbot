@@ -4,6 +4,7 @@ from Standardize import standardize_format
 
 def generate_pdf(resume_data, output_pdf_path):
     # Define the HTML template for the resume
+    resume_data = standardize_format(resume_data)
     resume_template = """
     <!DOCTYPE html>
     <html lang="en">
@@ -178,7 +179,6 @@ def generate_pdf(resume_data, output_pdf_path):
     # Render the template with the provided resume data
     template = Template(resume_template)
     # print(resume_data)
-    resume_data = standardize_format(resume_data)
     # print(resume_data)
     rendered_html = template.render(resume=resume_data)
 

@@ -1,3 +1,4 @@
+import re
 def find_key_by_value(data, search_key):
     """
     Recursively searches for a key in a nested dictionary and returns the corresponding value.
@@ -10,8 +11,13 @@ def find_key_by_value(data, search_key):
             if found_value:
                 return found_value
     return None
-
+def clean_text(text):
+    text = re.sub(r'\s*,\s*', '', text)  # Remove commas surrounded by whitespace
+    text = re.sub(r'[\t\n]', ' ', text)  # Replace tabs and newlines with spaces
+    text = re.sub(r'\s+', ' ', text)  # Collapse multiple spaces into one
+    return text.strip()
 def standardize_format(data):
+    data = clean_text(data)
     """
     Standardizes the input dictionary to a common format.
     """
