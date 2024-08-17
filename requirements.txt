@@ -6,7 +6,6 @@ langchain_google_genai
 langchain_community
 langchain-text-splitters
 langchain-google-genai
-python-dotenv
 faiss-cpu
 PyPDF2
 pdf2image
@@ -16,7 +15,8 @@ requests
 pdfplumber
 jinja2
 pdfkit
-python-telegram-bot
-json_repair
-reportlab
+aiohttp==3.8.1
+pdfplumber==0.7.6
+reportlab==3.6.12
+json_repair==0.1.1
 aiofiles
