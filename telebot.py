@@ -3,6 +3,7 @@ import io
 import json
 import tempfile
 import asyncio
+import logging
 from aiohttp import ClientSession
 from telegram import Update, Document, User
 from telegram.ext import (
@@ -15,13 +16,12 @@ from telegram.ext import (
 )
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
-from GeneratePDF import generate_pdf  # Adjust the import as per your project structure
-from app import process_resume  # Adjust the import as per your project structure
+from GeneratePDF import generate_pdf  # Adjust as per your project structure
+from app import process_resume  # Adjust as per your project structure
 from json_repair import repair_json
 from dotenv import load_dotenv
 import aiofiles
 import pdfplumber
-import logging
 
 # Configure logging
 logging.basicConfig(
@@ -29,24 +29,25 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-# Load environment variables from a .env file
+# Load environment variables
 load_dotenv()
-
-# Define your Telegram bot token as an environment variable
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
-# States for the conversation handler
+# Conversation states
 JOB_DESCRIPTION, RESUME = range(2)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    user: User = update.message.from_user
+    user = update.message.from_user
     if user:
-        context.user_data['user_id'] = user.id
-        context.user_data['first_name'] = user.first_name
-        context.user_data['username'] = user.username
+        context.user_data.update({
+            'user_id': user.id,
+            'first_name': user.first_name,
+            'username': user.username
+        })
         logging.info(f"User ID: {user.id}, First Name: {user.first_name}, Username: @{user.username}")
     else:
         logging.warning("User details not found.")
+    
     await update.message.reply_text(f'Hello {user.first_name}! Please provide the job description.')
     return JOB_DESCRIPTION
 
@@ -63,7 +64,7 @@ async def extract_text_from_pdf(pdf_bytes: bytes) -> str:
     return text
 
 async def receive_resume(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    document: Document = update.message.document
+    document = update.message.document
     if document.mime_type == 'application/pdf':
         try:
             with tempfile.TemporaryDirectory() as temp_dir:
@@ -77,33 +78,31 @@ async def receive_resume(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     pdf_bytes = await f.read()
 
                 resume_text = await extract_text_from_pdf(pdf_bytes)
-
                 job_description = context.user_data.get('job_description')
 
                 loop = asyncio.get_event_loop()
                 result = await loop.run_in_executor(None, process_resume, job_description, resume_text)
-                
                 result = result._result
 
-                # Access the text content
+                # Access and process the text content
                 text_content = result.candidates[0].content.parts[0].text
-
                 text_content = repair_json(text_content.replace("`", "'"))
+                
                 if not text_content.strip():
                     logging.error("Error: The JSON string is empty.")
                     await update.message.reply_text('An error occurred while processing the resume.')
                     return ConversationHandler.END
-                else:
-                    try:
-                        text_content = json.loads(text_content)
-                    except json.JSONDecodeError as e:
-                        logging.error(f"JSONDecodeError: {e}")
-                        await update.message.reply_text('An error occurred while processing the resume.')
-                        return ConversationHandler.END
-                    except Exception as e:
-                        logging.error(f"An unexpected error occurred: {e}")
-                        await update.message.reply_text('An unexpected error occurred.')
-                        return ConversationHandler.END
+
+                try:
+                    text_content = json.loads(text_content)
+                except json.JSONDecodeError as e:
+                    logging.error(f"JSONDecodeError: {e}")
+                    await update.message.reply_text('An error occurred while processing the resume.')
+                    return ConversationHandler.END
+                except Exception as e:
+                    logging.error(f"An unexpected error occurred: {e}")
+                    await update.message.reply_text('An unexpected error occurred.')
+                    return ConversationHandler.END
 
                 await loop.run_in_executor(None, generate_pdf, text_content, output_pdf_path)
 
@@ -112,9 +111,8 @@ async def receive_resume(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
         except Exception as e:
             logging.error(f"An error occurred: {e}")
-            # await update.message.reply_text('An error occurred while processing your request.')
+            await update.message.reply_text('An error occurred while processing your request.')
             return ConversationHandler.END
-
     else:
         await update.message.reply_text('Please upload a PDF file.')
         return RESUME
@@ -135,8 +133,7 @@ def main():
     )
 
     application.add_handler(conv_handler)
-
-    # Start the bot
+    logging.info("Starting the bot...")
     application.run_polling()
 
 if __name__ == '__main__':
