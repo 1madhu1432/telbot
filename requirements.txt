@@ -18,5 +18,5 @@ pdfkit
 aiohttp==3.8.1
 pdfplumber==0.7.6
 reportlab==3.6.12
-json_repair==0.1.1
+json_repair
 aiofiles
