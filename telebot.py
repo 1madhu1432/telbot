@@ -1,14 +1,33 @@
 import os
 import io
 import json
-import pdfplumber
+import tempfile
+import asyncio
+from aiohttp import ClientSession
 from telegram import Update, Document, User
-from telegram.ext import Updater, Application, CommandHandler, MessageHandler, ConversationHandler, CallbackContext, filters
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    ConversationHandler,
+    ContextTypes,
+    filters,
+)
 from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
 from GeneratePDF import generate_pdf  # Adjust the import as per your project structure
 from app import process_resume  # Adjust the import as per your project structure
 from json_repair import repair_json
 from dotenv import load_dotenv
+import aiofiles
+import pdfplumber
+import logging
+
+# Configure logging
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
 
 # Load environment variables from a .env file
 load_dotenv()
@@ -19,106 +38,106 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 # States for the conversation handler
 JOB_DESCRIPTION, RESUME = range(2)
 
-# Define a function to start the conversation
-async def start(update: Update, context: CallbackContext) -> int:
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user: User = update.message.from_user
     if user:
         context.user_data['user_id'] = user.id
         context.user_data['first_name'] = user.first_name
         context.user_data['username'] = user.username
-        print(f"User ID: {user.id}, First Name: {user.first_name}, Username: @{user.username}")
+        logging.info(f"User ID: {user.id}, First Name: {user.first_name}, Username: @{user.username}")
     else:
-        print("User details not found.")
+        logging.warning("User details not found.")
     await update.message.reply_text(f'Hello {user.first_name}! Please provide the job description.')
     return JOB_DESCRIPTION
 
-# Define a function to handle job description input
-async def receive_job_description(update: Update, context: CallbackContext) -> int:
+async def receive_job_description(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data['job_description'] = update.message.text
     await update.message.reply_text('Got it! Now, please send the resume in PDF format.')
     return RESUME
 
-# Function to extract text from a PDF file
-def extract_text_from_pdf(pdf_path):
+async def extract_text_from_pdf(pdf_bytes: bytes) -> str:
     text = ""
-    with pdfplumber.open(pdf_path) as pdf:
+    with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
         for page in pdf.pages:
             text += page.extract_text() or ""
     return text
 
-async def receive_resume(update: Update, context: CallbackContext) -> int:
+async def receive_resume(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     document: Document = update.message.document
     if document.mime_type == 'application/pdf':
-        # Get the file and download it locally
-        file = await context.bot.get_file(update.message.document)
-        pdf_path = 'resume.pdf'
-        await file.download_to_drive(pdf_path)
+        try:
+            with tempfile.TemporaryDirectory() as temp_dir:
+                pdf_path = os.path.join(temp_dir, 'resume.pdf')
+                output_pdf_path = os.path.join(temp_dir, 'processed_resume.pdf')
 
-        # Extract text from the PDF
-        resume_text = extract_text_from_pdf(pdf_path)
+                file = await context.bot.get_file(document.file_id)
+                await file.download_to_drive(custom_path=pdf_path)
 
-        # Get job description
-        job_description = context.user_data.get('job_description')
+                async with aiofiles.open(pdf_path, 'rb') as f:
+                    pdf_bytes = await f.read()
 
-        # Process the resume with the job description
-        result = process_resume(job_description, resume_text)
-        result = result._result
+                resume_text = await extract_text_from_pdf(pdf_bytes)
 
-        # Access the text content
-        text_content = result.candidates[0].content.parts[0].text
+                job_description = context.user_data.get('job_description')
 
-        # Repair and parse the JSON string
-        text_content = repair_json(text_content.replace("`", "'"))
-        # print(text_content)
-        if not text_content.strip():
-            print("Error: The JSON string is empty.")
-        else:
-            try:
-                text_content = json.loads(text_content)
-            except json.JSONDecodeError as e:
-                print(f"JSONDecodeError: {e}")
-            except Exception as e:
-                print(f"An error occurred: {e}")
+                loop = asyncio.get_event_loop()
+                result = await loop.run_in_executor(None, process_resume, job_description, resume_text)
+                
+                result = result._result
 
-        # Generate the PDF from the processed content
-        output_pdf_path = "processed_resume.pdf"
-        generate_pdf(text_content, output_pdf_path)
+                # Access the text content
+                text_content = result.candidates[0].content.parts[0].text
 
-        # Send the generated PDF file as a reply
-        await update.message.reply_document(document=open(output_pdf_path, 'rb'))
+                text_content = repair_json(text_content.replace("`", "'"))
+                if not text_content.strip():
+                    logging.error("Error: The JSON string is empty.")
+                    await update.message.reply_text('An error occurred while processing the resume.')
+                    return ConversationHandler.END
+                else:
+                    try:
+                        text_content = json.loads(text_content)
+                    except json.JSONDecodeError as e:
+                        logging.error(f"JSONDecodeError: {e}")
+                        await update.message.reply_text('An error occurred while processing the resume.')
+                        return ConversationHandler.END
+                    except Exception as e:
+                        logging.error(f"An unexpected error occurred: {e}")
+                        await update.message.reply_text('An unexpected error occurred.')
+                        return ConversationHandler.END
+
+                await loop.run_in_executor(None, generate_pdf, text_content, output_pdf_path)
+
+                async with aiofiles.open(output_pdf_path, 'rb') as f:
+                    await update.message.reply_document(document=await f.read(), filename='processed_resume.pdf')
+
+        except Exception as e:
+            logging.error(f"An error occurred: {e}")
+            await update.message.reply_text('An error occurred while processing your request.')
+            return ConversationHandler.END
 
     else:
         await update.message.reply_text('Please upload a PDF file.')
+        return RESUME
 
-    # Clean up the downloaded resume
-    if os.path.exists(pdf_path):
-        os.remove(pdf_path)
-
-    # End the conversation
+    await update.message.reply_text('Your processed resume has been generated and sent back to you.')
     return ConversationHandler.END
 
-# Define a function to handle the /start command
-async def start_command(update: Update, context: CallbackContext) -> None:
-    await update.message.reply_text('Welcome! Use /start to begin the process.')
+def main():
+    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
-# Create an application object
-application = (Application.builder().
-               token(TELEGRAM_BOT_TOKEN).
-               get_updates_pool_timeout(60).
-               get_updates_read_timeout(90)
-               .build()
-               )
-conv_handler = ConversationHandler(
-    entry_points=[CommandHandler('start', start)],
-    states={
-        JOB_DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_job_description)],
-        RESUME: [MessageHandler(filters.Document.ALL, receive_resume)],
-    },
-    fallbacks=[],
-)
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler('start', start)],
+        states={
+            JOB_DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_job_description)],
+            RESUME: [MessageHandler(filters.Document.PDF, receive_resume)],
+        },
+        fallbacks=[],
+    )
 
-# Add handlers for commands and conversations
-application.add_handler(conv_handler)
-# Start the bot
-if __name__ == '__main__':
+    application.add_handler(conv_handler)
+
+    # Start the bot
     application.run_polling()
+
+if __name__ == '__main__':
+    main()

@@ -19,3 +19,4 @@ pdfkit
 python-telegram-bot
 json_repair
 reportlab
+aiofiles
