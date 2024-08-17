@@ -5,7 +5,7 @@ import tempfile
 import logging
 import asyncio
 import aiohttp
-from aiohttp import web
+from aiohttp import web, FormData
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from GeneratePDF import generate_pdf  # Adjust as per your project structure
@@ -44,11 +44,11 @@ async def send_document(chat_id, document_path, filename):
     logging.info(f"Sending document {filename} to chat_id={chat_id}")
     async with aiohttp.ClientSession() as session:
         async with aiofiles.open(document_path, 'rb') as f:
-            document = await f.read()
-        files = {'document': (filename, document)}
-        data = {"chat_id": chat_id}
-        response = await session.post(url, data=data, files=files)
-        logging.info(f"Response from sendDocument: {await response.text()}")
+            form = FormData()
+            form.add_field('chat_id', str(chat_id))
+            form.add_field('document', await f.read(), filename=filename)
+            response = await session.post(url, data=form)
+            logging.info(f"Response from sendDocument: {await response.text()}")
 
 async def handle_start(chat_id, user_data):
     user_data['state'] = STATE_JOB_DESCRIPTION
@@ -148,8 +148,7 @@ async def set_webhook():
 def main():
     app = web.Application()
     app.router.add_post('/webhook', handle_webhook)
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(set_webhook())
+    asyncio.run(set_webhook())
     web.run_app(app, port=8000)
 
 if __name__ == '__main__':
