@@ -15,8 +15,8 @@ requests
 pdfplumber
 jinja2
 pdfkit
-aiohttp==3.8.1
-pdfplumber==0.7.6
-reportlab==3.6.12
+aiohttp
+pdfplumber
+reportlab
 json_repair
 aiofiles
