@@ -17,7 +17,7 @@ def clean_text(text):
     text = re.sub(r'\s+', ' ', text)  # Collapse multiple spaces into one
     return text.strip()
 def standardize_format(data):
-    data = clean_text(data)
+    # data = clean_text(data)
     """
     Standardizes the input dictionary to a common format.
     """
