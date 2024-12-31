@@ -145,7 +145,7 @@ async def set_webhook():
         response = await session.get(url)
         logging.info(f"Response from setWebhook: {await response.text()}")
 
-def main():
+def main(): 
     app = web.Application()
     app.router.add_post('/webhook', handle_webhook)
     asyncio.run(set_webhook())
